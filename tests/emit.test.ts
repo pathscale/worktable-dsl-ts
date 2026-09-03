@@ -22,9 +22,9 @@ function minimal(overrides: Partial<Schema> = {}): Schema {
 
 describe("persistence has three states", () => {
   test("omitted writes nothing, which is not the same as writing false", () => {
-    // The macro requires an explicit acknowledgement before accepting an index backend that
-    // cannot be persisted. Turning `Omitted` into `persist: false` would answer a question the
-    // author deliberately left open, and it would do it silently.
+    // The macro requires the persistence choice to be stated before accepting `congee` or
+    // `arctic`. Turning `Omitted` into `persist: false` would answer a question the author
+    // deliberately left open, and it would do it silently.
     expect(emit(minimal())).not.toContain("persist");
     expect(emit(minimal({ persist: "Omitted" }))).not.toContain("persist");
   });

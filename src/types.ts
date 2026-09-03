@@ -18,8 +18,8 @@
  * `worktables_index` is the default and is never written by the emitter: writing a default back
  * out would be correct and noisy, and this text is read by people.
  *
- * `congee` and `arctic` cannot participate in persistence, so a schema using either must state
- * `persist` explicitly — see {@link Persistence}.
+ * `congee` and `arctic` require `persist` to be stated explicitly. Both can be persisted; the
+ * macro simply will not pick a default for them. See {@link Persistence}.
  */
 export type IndexBackend = "WorktablesIndex" | "Indexset" | "Congee" | "Arctic";
 
@@ -46,9 +46,8 @@ export const DEFAULT_INDEX_BACKEND: IndexBackend = "WorktablesIndex";
  * Whether persistence was selected, and whether it was selected at all.
  *
  * Three states, not a boolean. "Not stated" is distinct from "stated false": the macro requires
- * an explicit acknowledgement before it will accept an index backend that cannot be persisted,
- * so an emitter that turned `Omitted` into `persist: false` would silently answer a question
- * the author left open.
+ * the choice to be stated before it will accept `congee` or `arctic`, so an emitter that turned
+ * `Omitted` into `persist: false` would silently answer a question the author left open.
  */
 export type Persistence = "Omitted" | "MemoryOnly" | "Persisted";
 

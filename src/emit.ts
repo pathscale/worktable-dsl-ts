@@ -35,9 +35,9 @@ export function emit(schema: Schema): string {
   out.push(`name: ${schema.name},`);
   out.push(`version: ${schema.version},`);
 
-  // An omitted `persist` is not the same as `persist: false`. The macro requires the
-  // acknowledgement before it will accept an index backend that cannot be persisted, so
-  // writing one in would silently answer a question the author left open.
+  // An omitted `persist` is not the same as `persist: false`. The macro requires the choice to
+  // be stated before it will accept `congee` or `arctic`, so writing one in would silently
+  // answer a question the author left open.
   switch (schema.persist ?? "Omitted") {
     case "Omitted":
       break;
