@@ -86,6 +86,15 @@ pages and corrupts its files. `emit` throws rather than writing that combination
 it enforces instead of leaving to the macro, because this one costs data rather than a
 compile error.
 
+## Releasing
+
+`0.1.0` was published by hand, because npm requires a package to exist before a trusted
+publisher can be configured. Everything after it comes from CI over OIDC, with no token in the
+repository and none on anybody's machine.
+
+A release is deliberate: bump the version in `package.json`, push to `master`, and
+`.github/workflows/release.yml` ships it. Pushing without a bump publishes nothing.
+
 ## Licence
 
 Dual [Apache-2.0](LICENSE-APACHE) / [MIT](LICENSE-MIT). Contributions are taken under both.
