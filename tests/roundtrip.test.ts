@@ -25,6 +25,27 @@ import type { Schema } from "../src/types.js";
 // layout with symlinks.
 const RS = process.env.WORKTABLE_RS ?? new URL("../../WorkTable/", import.meta.url).pathname;
 
+/**
+ * What to do about a Rust side that will not run.
+ *
+ * A test that fails without saying why trains people to ignore it, and this one fails for a
+ * mundane reason more often than for a real one: the sibling checkout is missing, is on a
+ * branch without the binaries, or has no toolchain to build them.
+ */
+function remedy(rs: string, stderr: string, code: number): string {
+  return [
+    `The Rust side could not be run from ${rs} (exit ${code}).`,
+    stderr.trim() === "" ? "(it printed nothing)" : stderr.trim(),
+    "",
+    "This is not a skippable test. It is the only thing comparing this emitter against the",
+    "one it has to match byte for byte, so it fails rather than passing quietly.",
+    "",
+    "Check that WORKTABLE_RS points at a WorkTable checkout, that the checkout has the",
+    "`worktable-parse` and `worktable-schemas` binaries under `dsl/src/bin/`, and that cargo",
+    "is on PATH.",
+  ].join("\n");
+}
+
 async function canonicaliseWithRust(text: string): Promise<{ ok: boolean; output: string }> {
   const proc = Bun.spawn(["cargo", "run", "-q", "-p", "worktable_dsl", "--bin", "worktable-parse"], {
     cwd: RS,
@@ -38,7 +59,7 @@ async function canonicaliseWithRust(text: string): Promise<{ ok: boolean; output
     new Response(proc.stderr).text(),
     proc.exited,
   ]);
-  return { ok: code === 0, output: code === 0 ? out : out + err };
+  return { ok: code === 0, output: code === 0 ? out : remedy(RS, out + err, code) };
 }
 
 const cases: Record<string, Schema> = {
