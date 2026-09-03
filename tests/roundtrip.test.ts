@@ -41,13 +41,13 @@ function remedy(rs: string, stderr: string, code: number): string {
     "one it has to match byte for byte, so it fails rather than passing quietly.",
     "",
     "Check that WORKTABLE_RS points at a WorkTable checkout, that the checkout has the",
-    "`worktable-parse` and `worktable-schemas` binaries under `dsl/src/bin/`, and that cargo",
-    "is on PATH.",
+    "`wt-dsl` and `worktable-schemas` binaries under `dsl/src/bin/`, and that cargo is on",
+    "PATH.",
   ].join("\n");
 }
 
 async function canonicaliseWithRust(text: string): Promise<{ ok: boolean; output: string }> {
-  const proc = Bun.spawn(["cargo", "run", "-q", "-p", "worktable_dsl", "--bin", "worktable-parse"], {
+  const proc = Bun.spawn(["cargo", "run", "-q", "-p", "worktable_dsl", "--bin", "wt-dsl", "--", "parse"], {
     cwd: RS,
     stdin: new TextEncoder().encode(text),
     stdout: "pipe",
