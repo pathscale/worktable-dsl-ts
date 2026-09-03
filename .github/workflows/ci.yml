@@ -20,14 +20,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Not optional, and not cached away. The whole value of this package is that its output
-      # matches the Rust emitter byte for byte, and nothing here can check that alone. A run
-      # without this checkout is a run that verified the emitter against itself.
+      # The `dsl` crate is not on WorkTable's default branch: it lives on the release branch,
+      # so checking out `master` gets a workspace that does not contain `worktable_dsl` at all.
+      # WORKTABLE_REF overrides it from repository settings when that changes, without a commit
+      # here.
+      #
+      # A WorkTable branch of the same name as this pull request's is preferred when one
+      # exists. The language and this emitter are separate repositories, so a change that
+      # touches the grammar and the emitter is two pull requests, and testing the new emitter
+      # against the old grammar tests nothing.
       - name: Checkout WorkTable
         uses: actions/checkout@v4
         with:
           repository: pathscale/WorkTable
+          ref: ${{ vars.WORKTABLE_REF || 'release/beta17' }}
           path: siblings/WorkTable
+
+      - name: Prefer a WorkTable branch matching this one
+        working-directory: siblings/WorkTable
+        run: |
+          branch="${{ github.head_ref }}"
+          if [ -n "$branch" ] && git fetch --depth 1 origin "$branch" 2>/dev/null; then
+            git checkout --detach FETCH_HEAD
+            echo "WorkTable: $branch"
+          else
+            echo "WorkTable: ${{ vars.WORKTABLE_REF || 'release/beta17' }}"
+          fi
 
       - uses: oven-sh/setup-bun@v1
         with:
