@@ -1,0 +1,40 @@
+{
+  "name": "@pathscale/worktable-dsl",
+  "version": "0.1.0",
+  "description": "TypeScript types and canonical-text emitter for the worktable! schema language",
+  "license": "Apache-2.0 OR MIT",
+  "repository": "github:pathscale/worktable-dsl-ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "prepack": "bun run build",
+    "smoke": "bun run scripts/smoke-consumer.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "typescript": "^5.6.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  }
+}

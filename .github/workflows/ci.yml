@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubicloud-standard-2
+    env:
+      # The tests spawn `worktable-parse` and `worktable-schemas` from a WorkTable checkout.
+      # actions/checkout refuses a path outside GITHUB_WORKSPACE, so the sibling lives inside it
+      # and is pointed at by environment variable rather than by reproducing a directory layout
+      # with symlinks.
+      WORKTABLE_RS: ${{ github.workspace }}/siblings/WorkTable
+    steps:
+      - uses: actions/checkout@v4
+
+      # Not optional, and not cached away. The whole value of this package is that its output
+      # matches the Rust emitter byte for byte, and nothing here can check that alone. A run
+      # without this checkout is a run that verified the emitter against itself.
+      - name: Checkout WorkTable
+        uses: actions/checkout@v4
+        with:
+          repository: pathscale/WorkTable
+          path: siblings/WorkTable
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: siblings/WorkTable
+
+      - run: bun install --frozen-lockfile || bun install
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Test
+        run: bun test
