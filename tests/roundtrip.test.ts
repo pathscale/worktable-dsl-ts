@@ -81,7 +81,11 @@ const cases: Record<string, Schema> = {
       { name: "score", ty: "i64" },
     ],
     indexes: [
-      { name: "by_nickname", column: "nickname", unique: true },
+      // An explicit backend, because the default is `arctic` and arctic cannot key an
+      // `Option<String>`. Leaving it off made this declaration valid when the default was
+      // `worktables_index` and invalid afterwards, which is worth knowing: changing that
+      // default silently invalidates any declaration indexing an optional string.
+      { name: "by_nickname", column: "nickname", unique: true, backend: "WorktablesIndex" },
       { name: "by_score", column: "score" },
     ],
   },

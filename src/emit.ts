@@ -17,9 +17,11 @@
  */
 
 import {
-  DATA_BUCKET_PAGE_SIZE,
   DEFAULT_INDEX_BACKEND,
+  DEFAULT_RUNTIME_BACKEND,
   INDEX_BACKEND_DSL_NAME,
+  runtimeToDsl,
+  sameRuntime,
   type ColumnSpec,
   type IndexSpec,
   type OperationSpec,
@@ -53,6 +55,12 @@ export function emit(schema: Schema): string {
     out.push(`partition_by: ${schema.partition_by.name}: ${schema.partition_by.ty},`);
   }
 
+  // An omitted `runtime` and an explicit `runtime: nagoya` are the same table, so the default
+  // is not written, for the same reason the default index backend is not.
+  if (schema.runtime != null && !sameRuntime(schema.runtime, DEFAULT_RUNTIME_BACKEND)) {
+    out.push(`runtime: ${runtimeToDsl(schema.runtime)},`);
+  }
+
   out.push("columns: {");
   for (const column of schema.columns) {
     out.push(`${INDENT}${columnToDsl(column)},`);
@@ -68,14 +76,25 @@ export function emit(schema: Schema): string {
     out.push("},");
   }
 
+  const columnarIndexes = schema.columnar_indexes ?? [];
+  if (columnarIndexes.length > 0) {
+    out.push("columnar_indexes: {");
+    for (const index of columnarIndexes) {
+      out.push(`${INDENT}${index.name}: {`);
+      out.push(`${INDENT}${INDENT}cluster_by: [${index.cluster_by.join(", ")}],`);
+      out.push(`${INDENT}},`);
+    }
+    out.push("},");
+  }
+
   const updates = schema.queries?.updates ?? [];
   const deletes = schema.queries?.deletes ?? [];
   const inPlace = schema.queries?.in_place ?? [];
   if (updates.length + deletes.length + inPlace.length > 0) {
     out.push("queries: {");
-    out.push(...queryBlock("update", updates));
-    out.push(...queryBlock("delete", deletes));
-    out.push(...queryBlock("in_place", inPlace));
+    out.push(...queryBlock("update", schema.queries?.update_runtime, updates));
+    out.push(...queryBlock("delete", schema.queries?.delete_runtime, deletes));
+    out.push(...queryBlock("in_place", schema.queries?.in_place_runtime, inPlace));
     out.push("},");
   }
 
@@ -84,29 +103,28 @@ export function emit(schema: Schema): string {
   // same thing, and treating them differently would emit two texts for one schema.
   const pageSize = schema.config?.page_size;
   const rowDerives = schema.config?.row_derives ?? [];
-  if (pageSize != null || rowDerives.length > 0) {
+  const columnarSlotId = schema.config?.columnar_slot_id;
+  const columnarChunkRows = schema.config?.columnar_chunk_rows;
+  if (pageSize != null || rowDerives.length > 0 || columnarSlotId != null || columnarChunkRows != null) {
     out.push("config: {");
     if (pageSize != null) {
       if (!Number.isInteger(pageSize) || pageSize <= 0) {
         throw new RangeError(`page_size must be a positive integer, got ${pageSize}`);
       }
-      // The one rule this emitter enforces rather than reporting. Everything else it writes is
-      // the caller's business and the macro's to judge, but this combination corrupts files
-      // rather than failing to compile, and it is cheap to refuse to write.
-      if (schema.persist === "Persisted" && pageSize !== DATA_BUCKET_PAGE_SIZE) {
-        throw new RangeError(
-          `page_size: ${pageSize} cannot be combined with persist: true. The on-disk layer ` +
-            `hardcodes ${DATA_BUCKET_PAGE_SIZE}-byte pages in every file seek, so a persisted ` +
-            `table with any other page size reads and writes the wrong pages and corrupts its ` +
-            `files. Remove page_size, or set it to ${DATA_BUCKET_PAGE_SIZE}; custom page sizes ` +
-            `remain available for in-memory tables, where they only size index nodes.`,
-        );
-      }
       out.push(`${INDENT}page_size: ${pageSize},`);
+    }
+    if (columnarSlotId != null) {
+      out.push(`${INDENT}columnar_slot_id: ${columnarSlotId},`);
+    }
+    if (columnarChunkRows != null) {
+      if (!Number.isInteger(columnarChunkRows) || columnarChunkRows <= 0) {
+        throw new RangeError(`columnar_chunk_rows must be a positive integer, got ${columnarChunkRows}`);
+      }
+      out.push(`${INDENT}columnar_chunk_rows: ${columnarChunkRows},`);
     }
     if (rowDerives.length > 0) {
       // `row_derives` reads identifiers until it meets another config key, so it has to be
-      // written last of the two.
+      // written last of all of them.
       out.push(`${INDENT}row_derives: ${rowDerives.join(", ")},`);
     }
     // No comma. `parse_configs` does not consume one after its block in versions before
@@ -150,6 +168,27 @@ function columnToDsl(column: ColumnSpec): string {
     out += " optional";
   }
 
+  // `columnar`, with only the options that were written. A bare `columnar` and
+  // `columnar(chunk_rows(2))` are different declarations and the second is not the first plus
+  // a default, so nothing is filled in on the way out.
+  if (column.columnar != null) {
+    out += " columnar";
+    const options: string[] = [];
+    const chunkRows = column.columnar.chunk_rows;
+    if (chunkRows != null) {
+      if (!Number.isInteger(chunkRows) || chunkRows <= 0) {
+        throw new RangeError(`chunk_rows must be a positive integer, got ${chunkRows}`);
+      }
+      options.push(`chunk_rows(${chunkRows})`);
+    }
+    if (column.columnar.compression != null) {
+      options.push(`compression(${column.columnar.compression})`);
+    }
+    if (options.length > 0) {
+      out += `(${options.join(", ")})`;
+    }
+  }
+
   // A primary-key column always carries a backend once parsed, because the model fills the
   // default in. Writing the default back out would be correct but noisy, and only a deliberate
   // choice is written.
@@ -171,11 +210,19 @@ function indexToDsl(index: IndexSpec): string {
   return out;
 }
 
-function queryBlock(kind: string, operations: OperationSpec[]): string[] {
+/**
+ * One `update:` / `delete:` / `in_place:` block.
+ *
+ * `runtime` is the profile named by `update runtime <profile>:`. The grammar accepts any
+ * identifier there and codegen currently ignores it, so this writes back what was given rather
+ * than validating it. Dropping it would still lose what the author wrote.
+ */
+function queryBlock(kind: string, runtime: string | null | undefined, operations: OperationSpec[]): string[] {
   if (operations.length === 0) {
     return [];
   }
-  const out = [`${INDENT}${kind}: {`];
+  const header = runtime != null ? `${kind} runtime ${runtime}` : kind;
+  const out = [`${INDENT}${header}: {`];
   for (const operation of operations) {
     out.push(`${INDENT}${INDENT}${operation.name}(${operation.columns.join(", ")}) by ${operation.by},`);
   }

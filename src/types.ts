@@ -37,10 +37,30 @@ export const INDEX_BACKEND_DSL_NAME: Readonly<Record<IndexBackend, string>> = {
   Arctic: "arctic",
 };
 
-/** The backends that require {@link Schema.persist} to be stated rather than omitted. */
-export const REQUIRES_EXPLICIT_PERSISTENCE: readonly IndexBackend[] = ["Congee", "Arctic"];
+/**
+ * The backends that require {@link Schema.persist} to be stated rather than omitted.
+ *
+ * Congee alone. Arctic was on this list and is no longer: it became the default backend, and a
+ * default that forced every table to state persistence would make the common declaration
+ * illegal.
+ */
+export const REQUIRES_EXPLICIT_PERSISTENCE: readonly IndexBackend[] = ["Congee"];
 
-export const DEFAULT_INDEX_BACKEND: IndexBackend = "WorktablesIndex";
+/**
+ * The backend a column gets when it does not name one.
+ *
+ * **This is `Arctic`, not `WorktablesIndex`.** The default changed in WorkTable and this
+ * constant did not follow, so the emitter wrote `using arctic` on every single-column key,
+ * which the Rust emitter omits, and omitted `using worktables_index` on every composite key,
+ * which the Rust emitter writes. Both texts parse; neither matched, and the corpus test failed
+ * on all 121 declarations.
+ *
+ * A composite key is the reason the rule cannot be "write nothing when unset": Arctic's native
+ * key contract cannot represent tuples, so a composite declaration with no `using` retains
+ * `WorktablesIndex` rather than becoming invalid because a global default moved. That is not
+ * the default, so it is written.
+ */
+export const DEFAULT_INDEX_BACKEND: IndexBackend = "Arctic";
 
 /**
  * Whether persistence was selected, and whether it was selected at all.
@@ -67,6 +87,8 @@ export interface ColumnSpec {
   ty: string;
   /** Whether `optional` was written, making the field `Option<ty>`. */
   optional?: boolean;
+  /** The `columnar(...)` options, when the column declared them. */
+  columnar?: ColumnarSpec | null;
   primary_key?: boolean;
   /** Only meaningful when `primary_key` is set. Defaults to `"None"`. */
   generator?: GeneratorType;
@@ -117,6 +139,18 @@ export interface QueriesSpec {
   updates?: OperationSpec[];
   deletes?: OperationSpec[];
   in_place?: OperationSpec[];
+  /**
+   * The profile named by `update runtime <profile>:`, when written.
+   *
+   * Unresolved on purpose: the grammar accepts any identifier here and codegen currently
+   * ignores it, so this carries the text rather than a validated choice. Dropping it would
+   * still lose what the author wrote.
+   */
+  update_runtime?: string | null;
+  /** The profile named by `delete runtime <profile>:`, when written. */
+  delete_runtime?: string | null;
+  /** The profile named by `in_place runtime <profile>:`, when written. */
+  in_place_runtime?: string | null;
 }
 
 /** The `config` block. */
@@ -124,14 +158,26 @@ export interface ConfigSpec {
   /**
    * Page size in bytes.
    *
-   * Cannot be combined with `persist: "Persisted"` unless it is exactly 16384: the on-disk
-   * layer hardcodes that page size in every file seek, so a persisted table with any other one
-   * reads and writes the wrong pages and corrupts its files. Custom page sizes remain available
-   * for in-memory tables, where they only size index nodes. See {@link DATA_BUCKET_PAGE_SIZE}.
+   * Combines with `persist: "Persisted"` at any size. It did not: the on-disk layer used to
+   * hardcode 16384 in every file seek, so a persisted table with any other page size read and
+   * wrote the wrong pages. The page stride is tunable now, and WorkTable carries a test that
+   * asserts the file lengths a half-size page produces, so refusing to write one would refuse a
+   * declaration the macro accepts. See {@link DATA_BUCKET_PAGE_SIZE} for the default.
    */
   page_size?: number | null;
   /** Extra derives placed on the generated row type. */
   row_derives?: string[];
+  /**
+   * `columnar_slot_id`, when it differs from the default.
+   *
+   * The written form is the Rust type name, `ColumnSlotId32` and so on, not a lowercase
+   * identifier: the grammar takes the type here. Absent means the default, because the Rust
+   * side stores the difference rather than the resolved value, and emitting a default nobody
+   * wrote is noise.
+   */
+  columnar_slot_id?: string | null;
+  /** `columnar_chunk_rows`, when it differs from the default. */
+  columnar_chunk_rows?: number | null;
 }
 
 /** The only page size a persisted table may state. */
@@ -159,4 +205,87 @@ export interface Schema {
   indexes?: IndexSpec[];
   queries?: QueriesSpec;
   config?: ConfigSpec;
+  /**
+   * The runtime the table is built against.
+   *
+   * Absent means the default, and the emitter does not write a default: an omitted `runtime`
+   * and an explicit `runtime: nagoya` are the same table.
+   */
+  runtime?: RuntimeBackend;
+  /**
+   * Columnar indexes in declaration order.
+   *
+   * A table with columnar fields but no clustering is legal, so an empty list and an absent
+   * one are the same thing and neither is written.
+   */
+  columnar_indexes?: ColumnarIndexSpec[];
+}
+
+/**
+ * A nagoya pool flavor.
+ *
+ * The wire form is the Rust variant name; the grammar takes the snake_case spelling.
+ */
+export type Flavor = "Locality" | "Spread" | "Throughput" | "LowLatency" | "WideInjector" | "SharedSlot";
+
+export const FLAVOR_DSL_NAME: Readonly<Record<Flavor, string>> = {
+  Locality: "locality",
+  Spread: "spread",
+  Throughput: "throughput",
+  LowLatency: "low_latency",
+  WideInjector: "wide_injector",
+  SharedSlot: "shared_slot",
+};
+
+export const DEFAULT_FLAVOR: Flavor = "SharedSlot";
+
+/**
+ * The runtime a table is built against.
+ *
+ * **A tagged union, not a string.** `Nagoya` carries a {@link Flavor} and `Tokio` does not, so
+ * serde writes `{ "Nagoya": "SharedSlot" }` for the first and `"Tokio"` for the second. Modelling
+ * it as a plain string emits `runtime: undefined` for every table, which is what it did.
+ */
+export type RuntimeBackend = { Nagoya: Flavor } | "Tokio";
+
+export const DEFAULT_RUNTIME_BACKEND: RuntimeBackend = { Nagoya: DEFAULT_FLAVOR };
+
+/** Whether two runtime selections are the same table. */
+export function sameRuntime(left: RuntimeBackend, right: RuntimeBackend): boolean {
+  if (left === "Tokio" || right === "Tokio") {
+    return left === right;
+  }
+  return left.Nagoya === right.Nagoya;
+}
+
+/**
+ * The declaration spelling.
+ *
+ * The flavor is written even when it is the default one: this is only reached for a backend
+ * that is not the default overall, and a reader comparing two declarations should not have to
+ * know which flavor a bare `nagoya` means.
+ */
+export function runtimeToDsl(backend: RuntimeBackend): string {
+  return backend === "Tokio" ? "tokio" : `nagoya(${FLAVOR_DSL_NAME[backend.Nagoya]})`;
+}
+
+/**
+ * A column's `columnar(...)` options.
+ *
+ * Present means the column declared `columnar`, with or without options. Absent options stay
+ * absent rather than being defaulted: `columnar` and `columnar(chunk_rows(2))` are different
+ * declarations, and the second is not the first plus a default.
+ */
+export interface ColumnarSpec {
+  /** `chunk_rows(n)`, when written. */
+  chunk_rows?: number | null;
+  /** `compression(name)`, when it differs from the default. */
+  compression?: string | null;
+}
+
+/** A columnar index: `name: { cluster_by: [field, ..] }`. */
+export interface ColumnarIndexSpec {
+  name: string;
+  /** The fields it clusters by, in declaration order. */
+  cluster_by: string[];
 }
