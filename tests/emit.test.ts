@@ -15,7 +15,7 @@ function minimal(overrides: Partial<Schema> = {}): Schema {
   return {
     name: "T",
     version: 1,
-    columns: [{ name: "id", ty: "u64", primary_key: true, index_backend: "WorktablesIndex" }],
+    columns: [{ name: "id", ty: "u64", primary_key: true, index_backend: "Arctic" }],
     ...overrides,
   };
 }
@@ -35,14 +35,16 @@ describe("persistence has three states", () => {
   });
 });
 
-describe("the page size a persisted table may not have", () => {
-  test("refuses the combination that corrupts files", () => {
-    // Not a compile error on the Rust side either — it parses. The macro refuses it, and the
-    // reason is that the on-disk layer seeks in 16384-byte pages regardless, so a persisted
-    // table with any other page size reads and writes the wrong ones.
-    expect(() => emit(minimal({ persist: "Persisted", config: { page_size: 4096 } }))).toThrow(
-      /cannot be combined with persist: true/,
-    );
+describe("the page size a persisted table may have", () => {
+  test("any of them, now that the page stride is tunable", () => {
+    // This used to throw. The on-disk layer seeked in 16384-byte pages regardless, so a
+    // persisted table with any other page size read and wrote the wrong ones, and refusing to
+    // write the declaration was cheaper than emitting one that corrupts files.
+    //
+    // The stride is tunable now, and WorkTable carries `tests/persistence/custom_page_size.rs`
+    // asserting the file lengths a half-size page produces. Refusing it here would refuse a
+    // declaration the macro accepts and tests.
+    expect(emit(minimal({ persist: "Persisted", config: { page_size: 4096 } }))).toContain("page_size: 4096,");
   });
 
   test("16384 is allowed, because it is what the on-disk layer already assumes", () => {
@@ -67,7 +69,7 @@ describe("null and absent are the same thing", () => {
       version: 1,
       partition_by: null,
       columns: [
-        { name: "id", ty: "u64", optional: false, primary_key: true, generator: "None", index_backend: "WorktablesIndex" },
+        { name: "id", ty: "u64", optional: false, primary_key: true, generator: "None", index_backend: "Arctic" },
         { name: "a", ty: "u64", optional: false, primary_key: false, generator: "None", index_backend: null },
       ],
       indexes: [],
@@ -78,7 +80,11 @@ describe("null and absent are the same thing", () => {
       name: "T",
       version: 1,
       columns: [
-        { name: "id", ty: "u64", primary_key: true, index_backend: "WorktablesIndex" },
+        // The same backend as the serde side above. It said `WorktablesIndex` while that side
+        // said `Arctic`, so the two schemas were never the same schema and the test compared
+        // two different texts; it passed only while `WorktablesIndex` was the default and both
+        // were therefore omitted.
+        { name: "id", ty: "u64", primary_key: true, index_backend: "Arctic" },
         { name: "a", ty: "u64" },
       ],
     };
@@ -90,13 +96,17 @@ describe("the default backend is never written", () => {
   test("neither on a primary key nor on a secondary index", () => {
     // A primary-key column always carries a backend once parsed, because the model fills the
     // default in. Writing it back would be correct and noisy, and this text is read by people.
+    //
+    // The default is `Arctic`, not `WorktablesIndex`. It changed in WorkTable, and this fixture
+    // named the old one, so the test asserted that a *non*-default was omitted and passed for
+    // the wrong reason until the constant caught up.
     const text = emit(
       minimal({
         columns: [
-          { name: "id", ty: "u64", primary_key: true, index_backend: "WorktablesIndex" },
+          { name: "id", ty: "u64", primary_key: true, index_backend: "Arctic" },
           { name: "a", ty: "u64" },
         ],
-        indexes: [{ name: "by_a", column: "a", backend: "WorktablesIndex" }],
+        indexes: [{ name: "by_a", column: "a", backend: "Arctic" }],
       }),
     );
     expect(text).not.toContain("using");
@@ -147,12 +157,13 @@ describe("clause order within a column is the grammar's", () => {
             optional: true,
             primary_key: true,
             generator: "Autoincrement",
-            index_backend: "Arctic",
+            // Not the default any more, which is what makes this a deliberate choice.
+            index_backend: "WorktablesIndex",
           },
         ],
       }),
     );
-    expect(text).toContain("id: u64 primary_key autoincrement optional using arctic,");
+    expect(text).toContain("id: u64 primary_key autoincrement optional using worktables_index,");
   });
 });
 
