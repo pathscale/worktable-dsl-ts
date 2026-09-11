@@ -72,6 +72,38 @@ export const DEFAULT_INDEX_BACKEND: IndexBackend = "Arctic";
 export type Persistence = "Omitted" | "MemoryOnly" | "Persisted";
 
 /**
+ * Which storage a table has.
+ *
+ * `"Paged"` is pages behind links, which is what a `worktable!` has always been. `"Vec"` is one
+ * contiguous `Vec<Row>` and an index of positions into it, declared as `vec: true`, and it pays
+ * for none of the paging, archived rows, lock map, change-data-capture or async surface.
+ *
+ * The grammar spells it as a boolean and the model carries an enum, deliberately: the schema is
+ * serialized and round-tripped, and serde enforces no cross-field invariant, so one enum saying
+ * one thing is safer than two flags that could disagree.
+ *
+ * Absent means `"Paged"`, and the emitter does not write it, for the same reason it does not
+ * write a default index backend: `vec: false` is what every declaration written before the key
+ * existed meant.
+ */
+export type Storage = "Paged" | "Vec";
+
+/**
+ * How many rows one partition holds, written as an index width.
+ *
+ * Required beside `partition_by` and never meaningful without it. A type rather than a count
+ * because it is an index width, which is what the generator needs, and because a count is not a
+ * power of two and duplicates a constant that lives in the caller's code and will drift.
+ *
+ * `"bool"` is 2 rows, `"u8"` is 256 and `"u16"` is 65,536, and each generates a partition
+ * addressed by position with no primary index at all. `"u32"` and `"u64"` are unbounded in
+ * practice and generate a full table per partition, which is what a partitioned declaration got
+ * before this key existed. There is no `unbounded` keyword: the widths run out of smallness, so
+ * `"u64"` is the escape.
+ */
+export type PartitionMaxSize = "bool" | "u8" | "u16" | "u32" | "u64";
+
+/**
  * The primary-key generator. Meaningful only on a primary-key column, and shared by every
  * column of a composite key.
  */
@@ -118,6 +150,13 @@ export interface IndexSpec {
 export interface PartitionKeySpec {
   name: string;
   ty: string;
+  /**
+   * The declared `partition_max_size`.
+   *
+   * Not optional, because the key it belongs to is not: emitting a `partition_by` without it
+   * produces text the Rust parser refuses.
+   */
+  max_size: PartitionMaxSize;
 }
 
 /** One generated query: `Name(columns) by key`. */
@@ -196,6 +235,11 @@ export interface Schema {
    * one wants a number either way. The emitter always writes it.
    */
   version: number;
+  /**
+   * Which storage the table has. Absent means `"Paged"`, and the emitter does not write a
+   * default.
+   */
+  storage?: Storage;
   /** Defaults to `"Omitted"`. */
   persist?: Persistence;
   partition_by?: PartitionKeySpec | null;

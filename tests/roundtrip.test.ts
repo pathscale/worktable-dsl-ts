@@ -135,10 +135,37 @@ const cases: Record<string, Schema> = {
   "a partitioned table": {
     name: "Partitioned",
     version: 2,
-    partition_by: { name: "shard", ty: "u32" },
+    partition_by: { name: "shard", ty: "u32", max_size: "u64" },
     columns: [
       { name: "id", ty: "u64", primary_key: true, index_backend: "WorktablesIndex" },
       { name: "value", ty: "String" },
+    ],
+  },
+
+  // A narrow width is the other shape entirely: the partition is addressed by
+  // position and has no primary index at all. The emitter does not care, which
+  // is the point of having it here, but a width that only ever appeared as
+  // `u64` in the corpus would leave the other branch unemitted.
+  "a partitioned table with a dense width": {
+    name: "DenselyPartitioned",
+    version: 1,
+    partition_by: { name: "symbol_id", ty: "u16", max_size: "u8" },
+    columns: [
+      { name: "exchange_id", ty: "u8", primary_key: true },
+      { name: "bid", ty: "f64" },
+    ],
+  },
+
+  // `vec: true`, which the emitter did not know about at all. The Rust side
+  // writes it only when true, so a paged table must not grow a `vec: false`
+  // line and this one must grow a `vec: true`.
+  "a vec-backed table": {
+    name: "VecBacked",
+    version: 1,
+    storage: "Vec",
+    columns: [
+      { name: "id", ty: "u64", primary_key: true },
+      { name: "value", ty: "u64" },
     ],
   },
 

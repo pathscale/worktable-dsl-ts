@@ -37,6 +37,12 @@ export function emit(schema: Schema): string {
   out.push(`name: ${schema.name},`);
   out.push(`version: ${schema.version},`);
 
+  // Only when true. `vec: false` is what every declaration written before this key existed
+  // meant, so writing it out would add a line to every emitted schema to say nothing.
+  if ((schema.storage ?? "Paged") === "Vec") {
+    out.push("vec: true,");
+  }
+
   // An omitted `persist` is not the same as `persist: false`. The macro requires the choice to
   // be stated before it will accept `congee` or `arctic`, so writing one in would silently
   // answer a question the author left open.
@@ -53,6 +59,9 @@ export function emit(schema: Schema): string {
 
   if (schema.partition_by != null) {
     out.push(`partition_by: ${schema.partition_by.name}: ${schema.partition_by.ty},`);
+    // Required beside it, so emitting one without the other produces text the Rust parser
+    // refuses.
+    out.push(`partition_max_size: ${schema.partition_by.max_size},`);
   }
 
   // An omitted `runtime` and an explicit `runtime: nagoya` are the same table, so the default
