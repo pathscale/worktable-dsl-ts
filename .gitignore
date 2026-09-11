@@ -3,3 +3,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 dist/
+
+# Packed tarballs from `npm pack`, produced when validating a release
+# candidate against a real consumer before publishing. Build output, never
+# source.
+*.tgz

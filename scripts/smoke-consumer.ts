@@ -33,8 +33,14 @@ config: {
 
 // Deliberately reaches for a type, a value export and the emitter, so a build that dropped any
 // one of them fails here rather than in somebody's editor.
+//
+// The backend assertion is the value export, and it went stale once: it read
+// `WorktablesIndex` after `c7948eb` moved the default to `Arctic`, so this gate
+// failed on every release attempt from then until it was noticed. Keep it
+// pointing at whatever `src/types.ts` says the default is — the assertion exists
+// to prove the shipped build carries the value, not to pin a particular one.
 const CONSUMER = `import { emit, DEFAULT_INDEX_BACKEND, type Schema } from "@pathscale/worktable-dsl";
-if (DEFAULT_INDEX_BACKEND !== "WorktablesIndex") {
+if (DEFAULT_INDEX_BACKEND !== "Arctic") {
   throw new Error("the shipped package disagrees about the default backend");
 }
 const schema: Schema = {
