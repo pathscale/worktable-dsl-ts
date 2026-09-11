@@ -11,8 +11,7 @@
  * is the failure that reaches a user.
  */
 
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REFERENCE = `name: Users,
@@ -39,7 +38,12 @@ config: {
 // failed on every release attempt from then until it was noticed. Keep it
 // pointing at whatever `src/types.ts` says the default is — the assertion exists
 // to prove the shipped build carries the value, not to pin a particular one.
-const CONSUMER = `import { emit, DEFAULT_INDEX_BACKEND, type Schema } from "@pathscale/worktable-dsl";
+const CONSUMER = `import { emit, DEFAULT_INDEX_BACKEND, DEFAULT_FLAVOR, DEFAULT_RUNTIME_BACKEND, FLAVOR_DSL_NAME, runtimeToDsl, sameRuntime, type Schema } from "@pathscale/worktable-dsl";
+if (DEFAULT_FLAVOR !== "SharedSlot" || FLAVOR_DSL_NAME.LowLatency !== "low_latency"
+    || runtimeToDsl({ Nagoya: "Throughput" }) !== "nagoya(throughput)"
+    || !sameRuntime(DEFAULT_RUNTIME_BACKEND, { Nagoya: "SharedSlot" })) {
+  throw new Error("the shipped runtime exports are missing or inconsistent");
+}
 if (DEFAULT_INDEX_BACKEND !== "Arctic") {
   throw new Error("the shipped package disagrees about the default backend");
 }
@@ -72,7 +76,8 @@ const run = async (cmd: string[], cwd: string) => {
 };
 
 const here = new URL("..", import.meta.url).pathname;
-const dir = mkdtempSync(join(tmpdir(), "worktable-smoke-"));
+mkdirSync(join(here, "target"), { recursive: true });
+const dir = mkdtempSync(join(here, "target", "worktable-smoke-"));
 try {
   await run(["bun", "run", "build"], here);
   await run(["bun", "pm", "pack", "--destination", dir], here);
