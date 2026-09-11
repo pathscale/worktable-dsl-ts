@@ -39,9 +39,9 @@ config: {
 // pointing at whatever `src/types.ts` says the default is — the assertion exists
 // to prove the shipped build carries the value, not to pin a particular one.
 const CONSUMER = `import { emit, DEFAULT_INDEX_BACKEND, DEFAULT_FLAVOR, DEFAULT_RUNTIME_BACKEND, FLAVOR_DSL_NAME, runtimeToDsl, sameRuntime, type Schema } from "@pathscale/worktable-dsl";
-if (DEFAULT_FLAVOR !== "SharedSlot" || FLAVOR_DSL_NAME.LowLatency !== "low_latency"
+if (DEFAULT_FLAVOR !== "Locality" || FLAVOR_DSL_NAME.LowLatency !== "low_latency"
     || runtimeToDsl({ Nagoya: "Throughput" }) !== "nagoya(throughput)"
-    || !sameRuntime(DEFAULT_RUNTIME_BACKEND, { Nagoya: "SharedSlot" })) {
+    || !sameRuntime(DEFAULT_RUNTIME_BACKEND, { Nagoya: "Locality" })) {
   throw new Error("the shipped runtime exports are missing or inconsistent");
 }
 if (DEFAULT_INDEX_BACKEND !== "Arctic") {
