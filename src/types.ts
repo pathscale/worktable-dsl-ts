@@ -15,7 +15,7 @@
 /**
  * The physical implementation of an index.
  *
- * `worktables_index` is the default and is never written by the emitter: writing a default back
+ * `arctic` is the default and is never written by the emitter: writing a default back
  * out would be correct and noisy, and this text is read by people.
  *
  * `congee` requires `persist` to be stated explicitly: it can be persisted, and the macro
@@ -292,7 +292,7 @@ export const FLAVOR_DSL_NAME: Readonly<Record<Flavor, string>> = {
   SharedSlot: "shared_slot",
 };
 
-export const DEFAULT_FLAVOR: Flavor = "SharedSlot";
+export const DEFAULT_FLAVOR: Flavor = "Locality";
 
 /**
  * The runtime a table is built against.
