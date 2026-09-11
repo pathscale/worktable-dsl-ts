@@ -14,7 +14,12 @@ export { emit, emitMacroInvocation } from "./emit.js";
 export {
   DATA_BUCKET_PAGE_SIZE,
   DEFAULT_INDEX_BACKEND,
+  DEFAULT_FLAVOR,
+  DEFAULT_RUNTIME_BACKEND,
+  FLAVOR_DSL_NAME,
   INDEX_BACKEND_DSL_NAME,
   REQUIRES_EXPLICIT_PERSISTENCE,
+  runtimeToDsl,
+  sameRuntime,
 } from "./types.js";
 export type * from "./types.js";
