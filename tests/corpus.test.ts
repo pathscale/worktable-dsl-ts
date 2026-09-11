@@ -18,8 +18,8 @@
 import { describe, expect, test } from "bun:test";
 import { emit } from "../src/emit.js";
 import type { Schema } from "../src/types.js";
+import { RS, rustBinary } from "./rust-cli.js";
 
-const RS = process.env.WORKTABLE_RS ?? new URL("../../WorkTable/", import.meta.url).pathname;
 
 /**
  * What to do about a Rust side that will not run.
@@ -37,7 +37,7 @@ function remedy(rs: string, stderr: string, code: number): string {
     "one it has to match byte for byte, so it fails rather than passing quietly.",
     "",
     "Check that WORKTABLE_RS points at a WorkTable checkout, that the checkout has the",
-    "`worktable-parse` and `worktable-schemas` binaries under `dsl/src/bin/`, and that cargo",
+    "`wt-dsl` and `worktable-schemas` binaries under `dsl/src/bin/`, and that cargo",
     "is on PATH.",
   ].join("\n");
 }
@@ -59,7 +59,7 @@ interface Corpus {
 
 async function loadCorpus(): Promise<Corpus> {
   const proc = Bun.spawn(
-    ["cargo", "run", "-q", "-p", "worktable_dsl", "--features", "json", "--bin", "worktable-schemas", "--", "."],
+    [rustBinary("worktable-schemas"), "."],
     {
       cwd: RS,
       stdout: "pipe",

@@ -8,3 +8,6 @@ dist/
 # candidate against a real consumer before publishing. Build output, never
 # source.
 *.tgz
+
+# Isolated Rust grammar builds and packed-package smoke consumers
+target/

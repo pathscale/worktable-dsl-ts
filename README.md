@@ -61,6 +61,11 @@ reporting green having compared nothing is worse than no suite. The cost is that
 cannot be tested without a Rust toolchain and a WorkTable checkout. That is the right price.
 
 Point them at a checkout with `WORKTABLE_RS`; it defaults to `../WorkTable`.
+The test harness builds an isolated copy of that checkout's `dsl/` package,
+then scans the original WorkTable tree. This preserves the authoritative grammar
+and full corpus comparison without requiring unpublished storage/runtime crates
+from the enclosing Cargo workspace. Missing Rust sources or a failed build still
+fail the suite. Source staging copies are removed after the build, including on failure.
 
 ```bash
 bun install && bun test

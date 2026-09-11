@@ -12,7 +12,7 @@ jobs:
   test:
     runs-on: ubicloud-standard-2
     env:
-      # The tests spawn `worktable-parse` and `worktable-schemas` from a WorkTable checkout.
+      # The tests spawn `wt-dsl` and `worktable-schemas` from a WorkTable checkout.
       # actions/checkout refuses a path outside GITHUB_WORKSPACE, so the sibling lives inside it
       # and is pointed at by environment variable rather than by reproducing a directory layout
       # with symlinks.
@@ -54,9 +54,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: siblings/WorkTable
 
       - run: bun install --frozen-lockfile || bun install
 
@@ -68,3 +65,9 @@ jobs:
 
       - name: Test
         run: bun test
+
+      - name: Packed consumer
+        run: bun run smoke
+
+      - name: Package validation
+        run: bunx --bun publint --strict
