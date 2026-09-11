@@ -18,10 +18,20 @@
  * `worktables_index` is the default and is never written by the emitter: writing a default back
  * out would be correct and noisy, and this text is read by people.
  *
- * `congee` and `arctic` require `persist` to be stated explicitly. Both can be persisted; the
- * macro simply will not pick a default for them. See {@link Persistence}.
+ * `congee` requires `persist` to be stated explicitly: it can be persisted, and the macro
+ * simply will not pick a default for it.
+ *
+ * `fxhash` is the one backend that is not an ordered tree. It is accepted only on a `vec: true`
+ * table and refused on a paged one, because a paged table generates a range select per index
+ * and writes each persisted index to disk as sorted pages, and a hash map can do neither. A
+ * table using it gets no range methods at all. The emitter carries it because the grammar does;
+ * whether a given declaration may use it is the macro's rule to enforce, not this type's.
+ *
+ * Arctic was on the explicit-persistence list once and is not any more: it became the default,
+ * and a default that forced every table to state persistence would make the common declaration
+ * illegal. See {@link Persistence}.
  */
-export type IndexBackend = "WorktablesIndex" | "Indexset" | "Congee" | "Arctic";
+export type IndexBackend = "WorktablesIndex" | "Indexset" | "Congee" | "FxHash" | "Arctic";
 
 /**
  * The spelling each backend has in the declaration text.
@@ -34,6 +44,7 @@ export const INDEX_BACKEND_DSL_NAME: Readonly<Record<IndexBackend, string>> = {
   WorktablesIndex: "worktables_index",
   Indexset: "indexset",
   Congee: "congee",
+  FxHash: "fxhash",
   Arctic: "arctic",
 };
 
