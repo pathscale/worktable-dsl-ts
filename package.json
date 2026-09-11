@@ -1,6 +1,6 @@
 {
   "name": "@pathscale/worktable-dsl",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript types and canonical-text emitter for the worktable! schema language",
   "license": "Apache-2.0 OR MIT",
   "repository": "github:pathscale/worktable-dsl-ts",
