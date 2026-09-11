@@ -88,9 +88,6 @@ jobs:
         with:
           node-version: 24
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: siblings/WorkTable
 
       - run: bun install
 

@@ -47,8 +47,9 @@ bun run build
 ```
 
 `WORKTABLE_RS` points at a WorkTable checkout; it defaults to `../WorkTable`. The tests build
-and run two binaries from it, `worktable-parse` and `worktable-schemas`, so the first run is
-slow and the rest are not.
+and run `wt-dsl` and `worktable-schemas` from an isolated copy of its `dsl/` package.
+The corpus scan still reads the original WorkTable tree. Storage/runtime publication
+must not be a prerequisite for testing this independent grammar package.
 
 ## Git
 

@@ -20,10 +20,8 @@
 import { describe, expect, test } from "bun:test";
 import { emit } from "../src/emit.js";
 import type { Schema } from "../src/types.js";
+import { RS, rustBinary } from "./rust-cli.js";
 
-// WORKTABLE_RS overrides the sibling default, so CI does not have to reproduce a directory
-// layout with symlinks.
-const RS = process.env.WORKTABLE_RS ?? new URL("../../WorkTable/", import.meta.url).pathname;
 
 /**
  * What to do about a Rust side that will not run.
@@ -47,7 +45,7 @@ function remedy(rs: string, stderr: string, code: number): string {
 }
 
 async function canonicaliseWithRust(text: string): Promise<{ ok: boolean; output: string }> {
-  const proc = Bun.spawn(["cargo", "run", "-q", "-p", "worktable_dsl", "--bin", "wt-dsl", "--", "parse"], {
+  const proc = Bun.spawn([rustBinary("wt-dsl"), "parse"], {
     cwd: RS,
     stdin: new TextEncoder().encode(text),
     stdout: "pipe",
@@ -224,7 +222,7 @@ const cases: Record<string, Schema> = {
 describe("emitted text canonicalises to itself through the Rust implementation", () => {
   test("the Rust binary is reachable", async () => {
     const { ok, output } = await canonicaliseWithRust("name: Probe,\ncolumns: { id: u64 primary_key },\n");
-    expect(ok, `worktable-parse could not be run from ${RS}:\n${output}`).toBe(true);
+    expect(ok, `wt-dsl could not be run from ${RS}:\n${output}`).toBe(true);
   }, 180_000);
 
   for (const [name, schema] of Object.entries(cases)) {
