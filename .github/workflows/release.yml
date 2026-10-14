@@ -29,6 +29,8 @@ jobs:
       publish: ${{ steps.decide.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -52,6 +54,8 @@ jobs:
       WORKTABLE_RS: ${{ github.workspace }}/siblings/WorkTable
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Match the 1.9 alpha grammar in WorkTable PR 105. The previous repository
       # variable pointed at an older emitter branch and missed this release's schema.
@@ -64,6 +68,7 @@ jobs:
       - name: Checkout WorkTable
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           repository: pathscale/WorkTable
           ref: feat/runtime-backends
           path: siblings/WorkTable
@@ -151,6 +156,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Tag the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
